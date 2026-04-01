@@ -628,78 +628,94 @@ function updHints(){
 function genHTML(){
   if(gR()===0)return'';
   const cols=gC(),rows=gR(),gap=gG();
-  
-  // Phase 1: Analyze which rows (grid + gap) will actually have content
-  const activeRows = []; // List of { type:'grid'|'gap', r:index, tds:[] }
-  
-  for(let r=0; r<rows; r++){
-    const gridTDs = [];
-    let firstCol=true;
-    for(let c=0; c<cols; c++){
-      const cell=G[r][c]; if(cell.hidden)continue;
-      if(!firstCol && gap>0) gridTDs.push(`<td width="${gap}"></td>`);
-      firstCol=false;
-      gridTDs.push({r, c, cell, type:'cell'});
-    }
-    activeRows.push({type:'grid', r, tds:gridTDs});
-    
-    if(r < rows-1 && gap > 0){
-      const gapTDs = [];
-      let firstGap=true;
-      for(let c=0; c<cols; c++){
-        if(!firstGap){
-          const horizSpanning = (G[r][c] === G[r][c+1] && G[r+1][c] === G[r+1][c+1] && G[r][c] === G[r+1][c]);
-          if(!horizSpanning) gapTDs.push(`<td width="${gap}"></td>`);
-        }
-        firstGap=false;
-        if(G[r][c] !== G[r+1][c]) gapTDs.push({r, c, type:'gap'});
-      }
-      activeRows.push({type:'gap', r, tds:gapTDs});
-    }
-  }
-  
-  // Filter only rows that have at least one TD
-  const renderedRows = activeRows.filter(row => row.tds.length > 0);
-  
-  // Helper to find how many renderedRows a span covers
-  function getActualSpan(startR, spanSize, isGapRow = false){
-    // startR is grid row index.
-    // Cell at r, span n covers grid rows r to r+n-1 AND gaps between them.
-    let count = 0;
-    renderedRows.forEach(row => {
-      const inGridRange = (row.r >= startR && row.r < startR + spanSize);
-      if(row.type === 'grid' && inGridRange) count++;
-      if(row.type === 'gap' && row.r >= startR && row.r < startR + spanSize - 1) count++;
-    });
-    return count;
+
+  // Build ordered list of all logical rows (grid rows + gap rows between them)
+  // Each entry: {type:'grid'|'gap', gridR: index_of_grid_row}
+  const logicalRows=[];
+  for(let r=0;r<rows;r++){
+    logicalRows.push({type:'grid',gridR:r});
+    if(r<rows-1&&gap>0) logicalRows.push({type:'gap',gridR:r});
   }
 
-  // Phase 2: Build final HTML string
-  const L=[]; L.push('<table cellpadding="0" cellspacing="0" class="NHN_Layout_Main">');
-  
-  renderedRows.forEach(row => {
-    const trContent = [];
-    row.tds.forEach(item => {
-      if(typeof item === 'string'){ trContent.push(item); return; }
-      
-      const{w:cw,h:ch}=cellB(item.r, item.c);
-      if(item.type === 'cell'){
-        const acs = gap > 0 ? (item.cell.colspan * 2 - 1) : item.cell.colspan;
-        const ars = getActualSpan(item.r, item.cell.rowspan);
-        const ca = acs > 1 ? ` colspan="${acs}"` : '';
-        const ra = ars > 1 ? ` rowspan="${ars}"` : '';
-        let tdHtml = `<td class="NHN_Layout_Preset" valign="top"${ca}${ra}>`;
-        tdHtml += `<table width="${cw}" height="${ch}" cellpadding="0" cellspacing="0" class="Basicborder NHN_Layout">`;
-        tdHtml += `<tr><td class="m-tcol-c"></td></tr></table></td>`;
-        trContent.push(tdHtml);
-      } else {
-        // Gap spacer
-        trContent.push(`<td height="${gap}"></td>`);
-      }
+  // For each logical row, decide if it has any visible TDs
+  // A gap row is visible if NOT all columns are spanned by a rowspan from above
+  // A grid row is visible if it has at least one non-hidden cell that starts there
+  function rowHasContent(lr){
+    if(lr.type==='grid'){
+      for(let c=0;c<cols;c++){if(!G[lr.gridR][c].hidden)return true;}
+      return false;
+    } else {
+      // gap row: visible if any column is NOT spanned across this gap
+      for(let c=0;c<cols;c++){if(G[lr.gridR][c]!==G[lr.gridR+1][c])return true;}
+      return false;
+    }
+  }
+
+  const renderedRows=logicalRows.filter(rowHasContent);
+  // Map from (type+gridR) -> rendered TR index
+  function trIndex(type,gridR){
+    return renderedRows.findIndex(lr=>lr.type===type&&lr.gridR===gridR);
+  }
+
+  // For a cell at (r,c) with given rowspan, count how many rendered TRs it physically occupies
+  function calcRowspan(r,rs){
+    // Cell spans grid rows r..r+rs-1, and gap rows r..r+rs-2 between them
+    let count=0;
+    renderedRows.forEach(lr=>{
+      if(lr.type==='grid'&&lr.gridR>=r&&lr.gridR<r+rs)count++;
+      if(lr.type==='gap'&&lr.gridR>=r&&lr.gridR<r+rs-1)count++;
     });
-    L.push('<tr>' + trContent.join('') + '</tr>');
+    return Math.max(1,count);
+  }
+
+  // For a cell with given colspan, count physical TDs (cols + gap spacers between)
+  function calcColspan(cs){
+    // colspan cs means cs grid cols + (cs-1) gap spacers
+    return gap>0?(cs*2-1):cs;
+  }
+
+  const L=[]; L.push('<table cellpadding="0" cellspacing="0" class="NHN_Layout_Main">');
+
+  renderedRows.forEach(lr=>{
+    const trContent=[];
+    if(lr.type==='grid'){
+      let firstCol=true;
+      for(let c=0;c<cols;c++){
+        const cell=G[lr.gridR][c];
+        if(cell.hidden)continue;
+        if(!firstCol&&gap>0) trContent.push(`<td width="${gap}"></td>`);
+        firstCol=false;
+        const{w:cw,h:ch}=cellB(lr.gridR,c);
+        const acs=calcColspan(cell.colspan);
+        const ars=calcRowspan(lr.gridR,cell.rowspan);
+        const ca=acs>1?` colspan="${acs}"`:'';
+        const ra=ars>1?` rowspan="${ars}"`:'';
+        trContent.push(
+          `<td class="NHN_Layout_Preset" valign="top"${ca}${ra}>`+
+          `<table width="${cw}" height="${ch}" cellpadding="0" cellspacing="0" class="Basicborder NHN_Layout">`+
+          `<tr><td class="m-tcol-c"></td></tr></table></td>`
+        );
+      }
+    } else {
+      // Gap row: emit height spacer for each column that is NOT spanned through
+      let firstCol=true;
+      for(let c=0;c<cols;c++){
+        const spanned=(G[lr.gridR][c]===G[lr.gridR+1][c]);
+        if(!spanned){
+          if(!firstCol&&gap>0) trContent.push(`<td width="${gap}"></td>`);
+          firstCol=false;
+          trContent.push(`<td height="${gap}"></td>`);
+        } else {
+          // spanned — column gap is covered by rowspan; we still need to emit
+          // horizontal gap spacer between non-spanned neighbours if needed
+          firstCol=false;
+        }
+      }
+      if(trContent.length===0)return; // fully spanned, skip
+    }
+    L.push('<tr>'+trContent.join('')+'</tr>');
   });
-  
+
   L.push('</table>'); return L.join('\n');
 }
 let _hT=null;
