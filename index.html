@@ -544,18 +544,18 @@ function hitHandle(px,py,l){
 function cornerCursor(c){return(c==='TL'||c==='BR')?'nwse-resize':'nesw-resize'}
 
 function hitGridLine(cx,cy){
-  const gap=gG(),cols=gC(),rows=gR(),HIT=6;
+  const gap=gG(),cols=gC(),rows=gR(),HIT=8;
   // Check vertical lines (between columns)
   let tx=0;
   for(let c=0;c<cols-1;c++){
-    tx+=gridColWidths[c];
+    tx+=S.iColW[c];
     if(cx>=tx-HIT && cx<=tx+gap+HIT)return{type:'col',idx:c};
     tx+=gap;
   }
   // Check horizontal lines (between rows)
   let ty=0;
   for(let r=0;r<rows-1;r++){
-    ty+=gridRowHeights[r];
+    ty+=S.iRowH[r];
     if(cy>=ty-HIT && cy<=ty+gap+HIT)return{type:'row',idx:r};
     ty+=gap;
   }
@@ -653,7 +653,7 @@ function genHTML(){
   L.push('<tr style="height:0; line-height:0; font-size:0;">');
   for(let c=0; c<cols; c++){
     if(c>0 && gap>0) L.push(`<td width="${gap}" style="width:${gap}px; height:0; padding:0; margin:0;"></td>`);
-    L.push(`<td width="${iColW[c]}" style="width:${iColW[c]}px; height:0; padding:0; margin:0;"></td>`);
+    L.push(`<td width="${S.iColW[c]}" style="width:${S.iColW[c]}px; height:0; padding:0; margin:0;"></td>`);
   }
   L.push('</tr>');
 
@@ -712,7 +712,7 @@ function genHTML(){
         if(!spanned){
           if(!firstCol&&gap>0) trContent.push(`<td width="${gap}" style="width:${gap}px; line-height:0; font-size:0;">&nbsp;</td>`);
           firstCol=false;
-          trContent.push(`<td height="${gap}" width="${iColW[c]}" style="width:${iColW[c]}px; height:${gap}px; line-height:0; font-size:0;">&nbsp;</td>`);
+          trContent.push(`<td height="${gap}" width="${S.iColW[c]}" style="width:${S.iColW[c]}px; height:${gap}px; line-height:0; font-size:0;">&nbsp;</td>`);
         } else {
           firstCol=false;
         }
@@ -871,7 +871,7 @@ window.addEventListener('mousemove',e=>{
         gridColWidths[idx]+=diff;
         gridColWidths[idx+1]-=diff;
         S._dx=p.x;
-        throttleRender();autoHTML();
+        normalizeGrid(); throttleRender(); autoHTML();
       }
     } else {
       const idx=S._gResizeIdx;
@@ -881,7 +881,7 @@ window.addEventListener('mousemove',e=>{
         gridRowHeights[idx]+=diff;
         gridRowHeights[idx+1]-=diff;
         S._dy=p.y;
-        throttleRender();autoHTML();
+        normalizeGrid(); throttleRender(); autoHTML();
       }
     }
   } else if(S.mode==='move'&&S._drag){
