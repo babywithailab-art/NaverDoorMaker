@@ -629,37 +629,54 @@ function genHTML(){
   if(gR()===0)return'';
   const cols=gC(),rows=gR(),gap=gG();
 
-  // Build ordered list of all logical rows (grid rows + gap rows between them)
-  // Each entry: {type:'grid'|'gap', gridR: index_of_grid_row}
+  // Build integer pixel arrays so total == canvas size exactly
+  // Uses floor + absorb-remainder-in-last-cell method
+  function toIntPx(floatArr, totalPx){
+    const px=floatArr.map(v=>Math.floor(v));
+    const rem=totalPx - px.reduce((a,b)=>a+b,0);
+    if(px.length>0) px[px.length-1]+=rem;
+    return px;
+  }
+  const totalContentW=pW()-gap*(cols-1);
+  const totalContentH=pH()-gap*(rows-1);
+  const iColW=toIntPx(gridColWidths,totalContentW);
+  const iRowH=toIntPx(gridRowHeights,totalContentH);
+
+  // Compute pixel width of a merged cell (c, colspan=cs)
+  function cellPxW(c,cs){
+    let w=0;
+    for(let i=0;i<cs;i++)w+=iColW[c+i];
+    w+=(cs-1)*gap;
+    return w;
+  }
+  // Compute pixel height of a merged cell (r, rowspan=rs)
+  function cellPxH(r,rs){
+    let h=0;
+    for(let i=0;i<rs;i++)h+=iRowH[r+i];
+    h+=(rs-1)*gap;
+    return h;
+  }
+
+  // Logical rows: grid rows interleaved with gap rows
   const logicalRows=[];
   for(let r=0;r<rows;r++){
     logicalRows.push({type:'grid',gridR:r});
     if(r<rows-1&&gap>0) logicalRows.push({type:'gap',gridR:r});
   }
 
-  // For each logical row, decide if it has any visible TDs
-  // A gap row is visible if NOT all columns are spanned by a rowspan from above
-  // A grid row is visible if it has at least one non-hidden cell that starts there
   function rowHasContent(lr){
     if(lr.type==='grid'){
       for(let c=0;c<cols;c++){if(!G[lr.gridR][c].hidden)return true;}
       return false;
     } else {
-      // gap row: visible if any column is NOT spanned across this gap
       for(let c=0;c<cols;c++){if(G[lr.gridR][c]!==G[lr.gridR+1][c])return true;}
       return false;
     }
   }
 
   const renderedRows=logicalRows.filter(rowHasContent);
-  // Map from (type+gridR) -> rendered TR index
-  function trIndex(type,gridR){
-    return renderedRows.findIndex(lr=>lr.type===type&&lr.gridR===gridR);
-  }
 
-  // For a cell at (r,c) with given rowspan, count how many rendered TRs it physically occupies
   function calcRowspan(r,rs){
-    // Cell spans grid rows r..r+rs-1, and gap rows r..r+rs-2 between them
     let count=0;
     renderedRows.forEach(lr=>{
       if(lr.type==='grid'&&lr.gridR>=r&&lr.gridR<r+rs)count++;
@@ -667,10 +684,7 @@ function genHTML(){
     });
     return Math.max(1,count);
   }
-
-  // For a cell with given colspan, count physical TDs (cols + gap spacers between)
   function calcColspan(cs){
-    // colspan cs means cs grid cols + (cs-1) gap spacers
     return gap>0?(cs*2-1):cs;
   }
 
@@ -685,7 +699,8 @@ function genHTML(){
         if(cell.hidden)continue;
         if(!firstCol&&gap>0) trContent.push(`<td width="${gap}"></td>`);
         firstCol=false;
-        const{w:cw,h:ch}=cellB(lr.gridR,c);
+        const cw=cellPxW(c,cell.colspan);
+        const ch=cellPxH(lr.gridR,cell.rowspan);
         const acs=calcColspan(cell.colspan);
         const ars=calcRowspan(lr.gridR,cell.rowspan);
         const ca=acs>1?` colspan="${acs}"`:'';
@@ -697,7 +712,6 @@ function genHTML(){
         );
       }
     } else {
-      // Gap row: emit height spacer for each column that is NOT spanned through
       let firstCol=true;
       for(let c=0;c<cols;c++){
         const spanned=(G[lr.gridR][c]===G[lr.gridR+1][c]);
@@ -706,12 +720,10 @@ function genHTML(){
           firstCol=false;
           trContent.push(`<td height="${gap}"></td>`);
         } else {
-          // spanned — column gap is covered by rowspan; we still need to emit
-          // horizontal gap spacer between non-spanned neighbours if needed
           firstCol=false;
         }
       }
-      if(trContent.length===0)return; // fully spanned, skip
+      if(trContent.length===0)return;
     }
     L.push('<tr>'+trContent.join('')+'</tr>');
   });
