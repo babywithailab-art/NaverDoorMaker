@@ -419,7 +419,7 @@ function initGrid(rows,cols){
   const baseW=(w-gap*(cols-1))/cols, baseH=(h-gap*(rows-1))/rows;
   gridColWidths=Array.from({length:cols},()=>baseW);
   gridRowHeights=Array.from({length:rows},()=>baseH);
-  $('gridCols').value=cols;$('gridRows').value=rows;updHints();autoHTML();
+  $('gridCols').value=cols;$('gridRows').value=rows;updHints();autoHTML();render();
 }
 function cellB(r,c){
   const cell=G[r][c],gap=gG();
@@ -623,33 +623,79 @@ function updHints(){
 function genHTML(){
   if(gR()===0)return'';
   const cols=gC(),rows=gR(),gap=gG();
-  const L=[];L.push('<table cellpadding="0" cellspacing="0" class="NHN_Layout_Main">');
-  for(let r=0;r<rows;r++){
-    const trContent=[];
-    let first=true;
-    for(let c=0;c<cols;c++){
-      const cell=G[r][c];if(cell.hidden)continue;
-      const{w:cw,h:ch}=cellB(r,c);
-      const ca=cell.colspan>1?` colspan="${cell.colspan}"`:'';
-      const ra=cell.rowspan>1?` rowspan="${cell.rowspan}"`:'';
-      
-      let tdHtml='';
-      if(!first&&gap>0)tdHtml+=`<td width="${gap}"></td>\n`;
-      first=false;
-      
-      tdHtml+=`<td class="NHN_Layout_Preset" valign="top"${ca}${ra}>\n`;
-      tdHtml+=`  <table width="${cw}" height="${ch}" cellpadding="0" cellspacing="0" class="Basicborder NHN_Layout">\n`;
-      tdHtml+=`    <tr><td class="m-tcol-c"></td></tr>\n`;
-      tdHtml+=`  </table>\n`;
-      tdHtml+=`</td>`;
-      trContent.push(tdHtml);
+  
+  // Phase 1: Analyze which rows (grid + gap) will actually have content
+  const activeRows = []; // List of { type:'grid'|'gap', r:index, tds:[] }
+  
+  for(let r=0; r<rows; r++){
+    const gridTDs = [];
+    let firstCol=true;
+    for(let c=0; c<cols; c++){
+      const cell=G[r][c]; if(cell.hidden)continue;
+      if(!firstCol && gap>0) gridTDs.push(`<td width="${gap}"></td>`);
+      firstCol=false;
+      gridTDs.push({r, c, cell, type:'cell'});
     }
-    if(trContent.length>0){
-      L.push('<tr>\n' + trContent.join('\n') + '\n</tr>');
-      if(r<rows-1&&gap>0)L.push(`<tr><td colspan="${cols*2-1}" height="${gap}"></td></tr>`);
+    activeRows.push({type:'grid', r, tds:gridTDs});
+    
+    if(r < rows-1 && gap > 0){
+      const gapTDs = [];
+      let firstGap=true;
+      for(let c=0; c<cols; c++){
+        if(!firstGap){
+          const horizSpanning = (G[r][c] === G[r][c+1] && G[r+1][c] === G[r+1][c+1] && G[r][c] === G[r+1][c]);
+          if(!horizSpanning) gapTDs.push(`<td width="${gap}"></td>`);
+        }
+        firstGap=false;
+        if(G[r][c] !== G[r+1][c]) gapTDs.push({r, c, type:'gap'});
+      }
+      activeRows.push({type:'gap', r, tds:gapTDs});
     }
   }
-  L.push('</table>');return L.join('\n');
+  
+  // Filter only rows that have at least one TD
+  const renderedRows = activeRows.filter(row => row.tds.length > 0);
+  
+  // Helper to find how many renderedRows a span covers
+  function getActualSpan(startR, spanSize, isGapRow = false){
+    // startR is grid row index.
+    // Cell at r, span n covers grid rows r to r+n-1 AND gaps between them.
+    let count = 0;
+    renderedRows.forEach(row => {
+      const inGridRange = (row.r >= startR && row.r < startR + spanSize);
+      if(row.type === 'grid' && inGridRange) count++;
+      if(row.type === 'gap' && row.r >= startR && row.r < startR + spanSize - 1) count++;
+    });
+    return count;
+  }
+
+  // Phase 2: Build final HTML string
+  const L=[]; L.push('<table cellpadding="0" cellspacing="0" class="NHN_Layout_Main">');
+  
+  renderedRows.forEach(row => {
+    const trContent = [];
+    row.tds.forEach(item => {
+      if(typeof item === 'string'){ trContent.push(item); return; }
+      
+      const{w:cw,h:ch}=cellB(item.r, item.c);
+      if(item.type === 'cell'){
+        const acs = gap > 0 ? (item.cell.colspan * 2 - 1) : item.cell.colspan;
+        const ars = getActualSpan(item.r, item.cell.rowspan);
+        const ca = acs > 1 ? ` colspan="${acs}"` : '';
+        const ra = ars > 1 ? ` rowspan="${ars}"` : '';
+        let tdHtml = `<td class="NHN_Layout_Preset" valign="top"${ca}${ra}>`;
+        tdHtml += `<table width="${cw}" height="${ch}" cellpadding="0" cellspacing="0" class="Basicborder NHN_Layout">`;
+        tdHtml += `<tr><td class="m-tcol-c"></td></tr></table></td>`;
+        trContent.push(tdHtml);
+      } else {
+        // Gap spacer
+        trContent.push(`<td height="${gap}"></td>`);
+      }
+    });
+    L.push('<tr>' + trContent.join('') + '</tr>');
+  });
+  
+  L.push('</table>'); return L.join('\n');
 }
 let _hT=null;
 function autoHTML(){clearTimeout(_hT);_hT=setTimeout(()=>{$('htmlOutput').value=genHTML()},80)}
