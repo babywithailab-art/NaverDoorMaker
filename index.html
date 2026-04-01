@@ -393,6 +393,12 @@ function gR(){return G.length}
 function gG(){return Math.max(0,parseInt($('gridGap').value)||0)}
 function pW(){return parseInt($('projW').value)||745}
 function pH(){return parseInt($('projH').value)||320}
+function toIntPx(floatArr, totalPx){
+  const px=floatArr.map(v=>Math.floor(v));
+  const rem=totalPx - px.reduce((a,b)=>a+b,0);
+  if(px.length>0) px[px.length-1]+=rem;
+  return px;
+}
 
 function normalizeGrid(){
   if(gR()===0)return;
@@ -409,6 +415,8 @@ function normalizeGrid(){
     const f=targetH/curH; gridRowHeights=gridRowHeights.map(v=>v*f);
     let s=0;for(let i=0;i<rows-1;i++)s+=gridRowHeights[i]; gridRowHeights[rows-1]=Math.max(1,targetH-s);
   }
+  S.iColW = toIntPx(gridColWidths, targetW);
+  S.iRowH = toIntPx(gridRowHeights, targetH);
 }
 
 function initGrid(rows,cols){
@@ -424,20 +432,20 @@ function initGrid(rows,cols){
 function cellB(r,c){
   const cell=G[r][c],gap=gG();
   let x=0, y=0, w=0, h=0;
-  for(let i=0;i<c;i++)x+=gridColWidths[i]+gap;
-  for(let i=0;i<r;i++)y+=gridRowHeights[i]+gap;
-  for(let i=0;i<cell.colspan;i++)w+=gridColWidths[c+i];
+  for(let i=0;i<c;i++)x+=S.iColW[i]+gap;
+  for(let i=0;i<r;i++)y+=S.iRowH[i]+gap;
+  for(let i=0;i<cell.colspan;i++)w+=S.iColW[c+i];
   w+=(cell.colspan-1)*gap;
-  for(let i=0;i<cell.rowspan;i++)h+=gridRowHeights[r+i];
+  for(let i=0;i<cell.rowspan;i++)h+=S.iRowH[r+i];
   h+=(cell.rowspan-1)*gap;
-  return{x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h)};
+  return{x,y,w,h};
 }
 function baseCB(r,c){
   const gap=gG();
   let x=0, y=0;
-  for(let i=0;i<c;i++)x+=gridColWidths[i]+gap;
-  for(let i=0;i<r;i++)y+=gridRowHeights[i]+gap;
-  return{x:Math.round(x),y:Math.round(y),w:Math.round(gridColWidths[c]),h:Math.round(gridRowHeights[r])};
+  for(let i=0;i<c;i++)x+=S.iColW[i]+gap;
+  for(let i=0;i<r;i++)y+=S.iRowH[i]+gap;
+  return{x,y,w:S.iColW[c],h:S.iRowH[r]};
 }
 function pt2Cell(cx,cy){
   const gap=gG(),cols=gC(),rows=gR();
@@ -516,7 +524,7 @@ const S={mode:'move',sel:{r1:0,c1:0,r2:0,c2:0},selActive:false,_sDrag:false,_sDr
   _drag:false,_dx:0,_dy:0,_dox:0,_doy:0,_ctxCell:null,
   _resize:false,_resizeCorner:null,_resizeAnchor:{x:0,y:0},_resizeLIdx:-1,
   _gResize:false,_gResizeIdx:-1,_gResizeType:null, // type: 'col' or 'row'
-  zoom:1.0, OFS:60};
+  zoom:1.0, OFS:60, iColW:[], iRowH:[]};
 
 function applyZoom(z){
   S.zoom=Math.max(0.2,Math.min(3.0,z));$('zoomSlider').value=Math.round(S.zoom*100);$('zoomVal').textContent=Math.round(S.zoom*100)+'%';
@@ -629,35 +637,26 @@ function genHTML(){
   if(gR()===0)return'';
   const cols=gC(),rows=gR(),gap=gG();
 
-  // Build integer pixel arrays so total == canvas size exactly
-  // Uses floor + absorb-remainder-in-last-cell method
-  function toIntPx(floatArr, totalPx){
-    const px=floatArr.map(v=>Math.floor(v));
-    const rem=totalPx - px.reduce((a,b)=>a+b,0);
-    if(px.length>0) px[px.length-1]+=rem;
-    return px;
-  }
-  const totalContentW=pW()-gap*(cols-1);
-  const totalContentH=pH()-gap*(rows-1);
-  const iColW=toIntPx(gridColWidths,totalContentW);
-  const iRowH=toIntPx(gridRowHeights,totalContentH);
-
-  // Compute pixel width of a merged cell (c, colspan=cs)
   function cellPxW(c,cs){
-    let w=0;
-    for(let i=0;i<cs;i++)w+=iColW[c+i];
-    w+=(cs-1)*gap;
-    return w;
+    let w=0; for(let i=0;i<cs;i++)w+=S.iColW[c+i];
+    w+=(cs-1)*gap; return w;
   }
-  // Compute pixel height of a merged cell (r, rowspan=rs)
   function cellPxH(r,rs){
-    let h=0;
-    for(let i=0;i<rs;i++)h+=iRowH[r+i];
-    h+=(rs-1)*gap;
-    return h;
+    let h=0; for(let i=0;i<rs;i++)h+=S.iRowH[r+i];
+    h+=(rs-1)*gap; return h;
   }
 
-  // Logical rows: grid rows interleaved with gap rows
+  const L=[]; L.push('<table cellpadding="0" cellspacing="0" class="NHN_Layout_Main" style="table-layout:fixed; border-collapse:collapse;">');
+
+  // --- Step 1: Transparent Skeleton Row (to fix column widths) ---
+  L.push('<tr style="height:0; line-height:0; font-size:0;">');
+  for(let c=0; c<cols; c++){
+    if(c>0 && gap>0) L.push(`<td width="${gap}" style="width:${gap}px; height:0; padding:0; margin:0;"></td>`);
+    L.push(`<td width="${iColW[c]}" style="width:${iColW[c]}px; height:0; padding:0; margin:0;"></td>`);
+  }
+  L.push('</tr>');
+
+  // --- Step 2: Actual Grid Rows ---
   const logicalRows=[];
   for(let r=0;r<rows;r++){
     logicalRows.push({type:'grid',gridR:r});
@@ -684,11 +683,7 @@ function genHTML(){
     });
     return Math.max(1,count);
   }
-  function calcColspan(cs){
-    return gap>0?(cs*2-1):cs;
-  }
-
-  const L=[]; L.push('<table cellpadding="0" cellspacing="0" class="NHN_Layout_Main">');
+  function calcColspan(cs){ return gap>0?(cs*2-1):cs; }
 
   renderedRows.forEach(lr=>{
     const trContent=[];
@@ -697,18 +692,16 @@ function genHTML(){
       for(let c=0;c<cols;c++){
         const cell=G[lr.gridR][c];
         if(cell.hidden)continue;
-        if(!firstCol&&gap>0) trContent.push(`<td width="${gap}"></td>`);
+        if(!firstCol&&gap>0) trContent.push(`<td width="${gap}" style="width:${gap}px; line-height:0; font-size:0;">&nbsp;</td>`);
         firstCol=false;
-        const cw=cellPxW(c,cell.colspan);
-        const ch=cellPxH(lr.gridR,cell.rowspan);
-        const acs=calcColspan(cell.colspan);
-        const ars=calcRowspan(lr.gridR,cell.rowspan);
-        const ca=acs>1?` colspan="${acs}"`:'';
-        const ra=ars>1?` rowspan="${ars}"`:'';
+        const cw=cellPxW(c,cell.colspan), ch=cellPxH(lr.gridR,cell.rowspan);
+        const acs=calcColspan(cell.colspan), ars=calcRowspan(lr.gridR,cell.rowspan);
+        const ca=acs>1?` colspan="${acs}"`:'', ra=ars>1?` rowspan="${ars}"`:'';
+        
         trContent.push(
-          `<td class="NHN_Layout_Preset" valign="top"${ca}${ra}>`+
-          `<table width="${cw}" height="${ch}" cellpadding="0" cellspacing="0" class="Basicborder NHN_Layout">`+
-          `<tr><td class="m-tcol-c"></td></tr></table></td>`
+          `<td class="NHN_Layout_Preset" valign="top"${ca}${ra} width="${cw}" style="width:${cw}px; height:${ch}px; line-height:0; font-size:0;">`+
+          `<table width="${cw}" height="${ch}" cellpadding="0" cellspacing="0" class="Basicborder NHN_Layout" style="table-layout:fixed; width:${cw}px; height:${ch}px;">`+
+          `<tr><td class="m-tcol-c" style="line-height:0; font-size:0;">&nbsp;</td></tr></table></td>`
         );
       }
     } else {
@@ -716,9 +709,9 @@ function genHTML(){
       for(let c=0;c<cols;c++){
         const spanned=(G[lr.gridR][c]===G[lr.gridR+1][c]);
         if(!spanned){
-          if(!firstCol&&gap>0) trContent.push(`<td width="${gap}"></td>`);
+          if(!firstCol&&gap>0) trContent.push(`<td width="${gap}" style="width:${gap}px; line-height:0; font-size:0;">&nbsp;</td>`);
           firstCol=false;
-          trContent.push(`<td height="${gap}"></td>`);
+          trContent.push(`<td height="${gap}" width="${iColW[c]}" style="width:${iColW[c]}px; height:${gap}px; line-height:0; font-size:0;">&nbsp;</td>`);
         } else {
           firstCol=false;
         }
@@ -728,7 +721,9 @@ function genHTML(){
     L.push('<tr>'+trContent.join('')+'</tr>');
   });
 
-  L.push('</table>'); return L.join('\n');
+  L.push('</table>'); 
+  // Compress: Remove line breaks between tags for Naver compatibility
+  return L.join('').replace(/>\s+</g,'><');
 }
 let _hT=null;
 function autoHTML(){clearTimeout(_hT);_hT=setTimeout(()=>{$('htmlOutput').value=genHTML()},80)}
