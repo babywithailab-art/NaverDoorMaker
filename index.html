@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>네이버 카페 도어이미지 메이커</title>
+<meta name="description" content="네이버 카페 레이아웃용 도어이미지 분할기"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0f14;--sf:#161a24;--sf2:#1e2333;--bd:#2a3050;--ac:#4f7cff;--ac2:#7c4fff;--ok:#2ecc71;--ng:#e74c3c;--tx:#e8ecf4;--tx2:#8a94b0;--r:8px}
+body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:var(--bg);color:var(--tx);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{height:48px;background:var(--sf);border-bottom:1px solid var(--bd);display:flex;align-items:center;padding:0 14px;gap:9px;flex-shrink:0;z-index:20}
+.logo{font-weight:700;font-size:14px;background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hdv{width:1px;height:20px;background:var(--bd)}
+.hds{font-size:11px;color:var(--tx2)}.sp{flex:1}
+.mg{display:flex;gap:3px;background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:2px}
+.mb{padding:3px 9px;border-radius:6px;border:none;background:transparent;color:var(--tx2);font-size:11px;font-weight:600;cursor:pointer;transition:all .14s}
+.mb.on{background:var(--ac);color:#fff}
+.pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(79,124,255,.12);color:var(--ac)}
+.ab{display:flex;flex:1;overflow:hidden}
+/* sidebar */
+.sb{width:268px;background:var(--sf);border-right:1px solid var(--bd);overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column}
+.sb::-webkit-scrollbar{width:4px}.sb::-webkit-scrollbar-thumb{background:var(--bd);border-radius:4px}
+.ps{padding:11px 13px;border-bottom:1px solid var(--bd)}
+.st{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;color:var(--tx2);margin-bottom:8px}
+.dz{border:2px dashed var(--bd);border-radius:var(--r);padding:12px 8px;text-align:center;cursor:pointer;background:var(--sf2);position:relative;transition:all .18s}
+.dz:hover,.dz.ov{border-color:var(--ac);background:rgba(79,124,255,.05)}
+.dz input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.dzi{font-size:20px;margin-bottom:3px}.dzt{font-size:11px;color:var(--tx2)}
+/* layers */
+.ly-list{display:flex;flex-direction:column;gap:3px;max-height:160px;overflow-y:auto;margin-bottom:6px}
+.ly-list::-webkit-scrollbar{width:3px}.ly-list::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+.ly-item{display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:6px;background:var(--sf2);border:1px solid transparent;cursor:pointer;transition:all .14s}
+.ly-item:hover{border-color:var(--bd)}
+.ly-item.active{border-color:var(--ac);background:rgba(79,124,255,.08)}
+.ly-eye{background:none;border:none;cursor:pointer;font-size:13px;padding:0;flex-shrink:0;opacity:.7;transition:opacity .14s}
+.ly-eye:hover{opacity:1}
+.ly-thumb{border-radius:3px;flex-shrink:0;object-fit:contain;background:repeating-conic-gradient(#2a2a2a 0% 25%,transparent 0% 50%) 0 0/8px 8px}
+.ly-name{font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx)}
+.ly-btns{display:flex;gap:2px;flex-shrink:0}
+.ly-btn{background:var(--sf);border:1px solid var(--bd);color:var(--tx2);border-radius:4px;width:18px;height:18px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.ly-btn:hover:not(:disabled){border-color:var(--ac);color:var(--ac)}
+.ly-btn:disabled{opacity:.3;cursor:not-allowed}
+/* field */
+.fr{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.fr label{font-size:10px;color:var(--tx2);flex:0 0 66px}
+.ig{display:flex;align-items:center;gap:3px;flex:1}
+input[type=number]{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:11px;font-family:'JetBrains Mono',monospace;padding:4px 6px;width:100%;-moz-appearance:textfield;appearance:textfield;transition:border-color .15s}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type=number]:focus{outline:none;border-color:var(--ac)}
+.iu{font-size:9px;color:var(--tx2);flex-shrink:0}
+.lk{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;color:var(--tx2);width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;flex-shrink:0;transition:all .15s}
+.lk.on{border-color:var(--ac);color:var(--ac)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:6px 11px;border-radius:var(--r);font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all .16s;white-space:nowrap}
+.bp{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff}.bp:hover{opacity:.85;transform:translateY(-1px)}
+.bs{background:var(--sf2);border:1px solid var(--bd);color:var(--tx)}.bs:hover{border-color:var(--ac);color:var(--ac)}
+.bg{background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.25);color:var(--ok)}.bg:hover{background:rgba(46,204,113,.2)}
+.bd2{background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.25);color:var(--ng)}.bd2:hover{background:rgba(231,76,60,.2)}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none!important}
+.bf{width:100%}.br{display:flex;gap:4px;margin-top:4px}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:4px;background:var(--sf2);border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:13px;height:13px;border-radius:50%;background:var(--ac);cursor:pointer}
+.sv{font-size:10px;font-family:'JetBrains Mono';color:var(--tx);min-width:30px;text-align:right}
+.dh{font-size:9px;color:var(--tx2);margin-top:3px;opacity:.7}
+.dh span{color:var(--ac);font-family:'JetBrains Mono'}
+input[type=color]{width:24px;height:24px;border:1px solid var(--bd);border-radius:6px;background:none;cursor:pointer;padding:2px}
+.gc{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:7px}
+.mp{background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:8px;display:flex;flex-direction:column;gap:5px}
+.mpi{font-size:10px;color:var(--tx2);text-align:center}
+/* canvas */
+.ca{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:auto;background:radial-gradient(circle at 20% 20%,rgba(79,124,255,.06) 0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(124,79,255,.06) 0%,transparent 50%),var(--bg);padding:18px;gap:9px}
+.ca.dv{border:2px dashed var(--ac);background:rgba(79,124,255,.04)}
+.ph{display:flex;flex-direction:column;align-items:center;gap:9px;color:var(--tx2);font-size:13px;opacity:.4}
+.phi{font-size:40px}
+.cw{position:relative;display:inline-block;box-shadow:0 8px 36px rgba(0,0,0,.6);border-radius:3px;overflow:hidden}
+.cw::before{content:'';position:absolute;inset:0;background-image:linear-gradient(45deg,#2a2a2a 25%,transparent 25%),linear-gradient(-45deg,#2a2a2a 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#2a2a2a 75%),linear-gradient(-45deg,transparent 75%,#2a2a2a 75%);background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0;z-index:0}
+#mainCanvas{position:relative;z-index:1;display:block}
+#overlayCanvas{position:absolute;inset:0;z-index:2;pointer-events:auto;cursor:crosshair}
+#overlayCanvas.mv{cursor:grab}#overlayCanvas.mv.dr{cursor:grabbing}
+.ci{font-size:10px;color:var(--tx2);font-family:'JetBrains Mono',monospace}
+/* right panel */
+.rp{width:330px;background:var(--sf);border-left:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.rph{padding:11px 13px 8px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.rpt{font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px}
+.how{flex:1;overflow:auto}
+#htmlOutput{width:100%;height:100%;background:var(--sf2);border:none;color:#9ecbff;font-family:'JetBrains Mono',monospace;font-size:10px;padding:11px;resize:none;outline:none;line-height:1.6}
+#htmlOutput::-webkit-scrollbar{width:4px}#htmlOutput::-webkit-scrollbar-thumb{background:var(--bd);border-radius:4px}
+.rpf{padding:9px 11px;border-top:1px solid var(--bd);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.ct{font-size:10px;color:var(--ok);text-align:center;height:12px;transition:opacity .28s}.ct.h{opacity:0}
+/* context menu */
+.ctx{position:fixed;background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:4px;min-width:155px;z-index:1000;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none}
+.ctx.show{display:block}
+.ci2{padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;color:var(--tx);transition:background .1s}.ci2:hover{background:var(--sf2)}
+.ci2.ng{color:var(--ng)}.ci2.ac{color:var(--ac);font-weight:600}
+.csp{height:1px;background:var(--bd);margin:3px 0}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🗂 NaverCafe DoorMaker</div>
+  <div class="hdv"></div><div class="hds">네이버 카페 레이아웃 이미지 분할기</div>
+  <div class="sp"></div>
+  <div class="mg">
+    <button class="mb on" id="btnMove">🖱 이동</button>
+    <button class="mb" id="btnSelect">🔲 선택</button>
+  </div>
+  <div class="hdv"></div>
+  <div class="pill" id="statusPill">레이어 없음</div>
+</header>
+
+<div class="ab">
+<aside class="sb">
+
+  <!-- LAYERS -->
+  <div class="ps">
+    <div class="st">🗂 레이어</div>
+    <div class="ly-list" id="layerList"></div>
+    <div class="dz" id="dropZone" style="margin-bottom:6px">
+      <input type="file" id="fileInput" accept="image/*"/>
+      <div class="dzi">🖼</div>
+      <div class="dzt">클릭하거나 드래그로 레이어 추가<br><small style="opacity:.55">PNG · JPG · WebP</small></div>
+    </div>
+    <div class="br">
+      <button class="btn bd2 bf" style="font-size:10px" id="delLayerBtn" disabled>🗑 선택 레이어 삭제</button>
+    </div>
+    <!-- active layer controls -->
+    <div id="alc" style="display:none;margin-top:8px">
+      <div class="fr" style="margin-bottom:0">
+        <label>불투명도</label>
+        <input type="range" id="layerOp" min="0" max="100" value="100"/>
+        <span class="sv" id="lopVal">100%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CANVAS SIZE -->
+  <div class="ps">
+    <div class="st">📐 캔버스 크기</div>
+    <div class="fr"><label>가로</label><div class="ig"><input type="number" id="projW" value="745" min="1" max="4000"/><span class="iu">px</span></div></div>
+    <div class="fr"><label>세로</label><div class="ig"><input type="number" id="projH" value="320" min="1" max="4000"/><span class="iu">px</span></div></div>
+    <div class="fr"><label>확대</label>
+      <input type="range" id="zoomSlider" min="20" max="300" value="100" step="5"/>
+      <span class="sv" id="zoomVal" style="min-width:35px">100%</span>
+    </div>
+    <div class="dh">캔버스: <span id="dimHint">745 × 320</span> px</div>
+  </div>
+
+  <!-- GRID -->
+  <div class="ps">
+    <div class="st">⊞ 격자 설정</div>
+    <div class="fr"><label>열 수</label><div class="ig"><input type="number" id="gridCols" value="6" min="1" max="50"/></div></div>
+    <div class="fr"><label>행 수</label><div class="ig"><input type="number" id="gridRows" value="1" min="1" max="50"/></div></div>
+    <div class="fr"><label>간격</label><div class="ig"><input type="number" id="gridGap" value="0" min="0" max="100"/><span class="iu">px</span></div></div>
+    <div class="fr"><label>선 투명도</label><input type="range" id="gridOp" min="10" max="100" value="70"/><span class="sv" id="gopVal">70%</span></div>
+    <div class="fr"><label>선 색상</label><input type="color" id="gridColor" value="#ff4f7c"/></div>
+    <div class="dh" style="margin-bottom:4px">셀 크기: <span id="cellHint">—</span></div>
+    <div class="gc">
+      <button class="btn bg" id="addRowBtn">+ 행 추가</button>
+      <button class="btn bd2" id="delRowBtn">− 행 삭제</button>
+      <button class="btn bg" id="addColBtn">+ 열 추가</button>
+      <button class="btn bd2" id="delColBtn">− 열 삭제</button>
+    </div>
+  </div>
+
+  <!-- IMAGE SIZE (active layer) -->
+  <div class="ps">
+    <div class="st">🔲 이미지 크기 <span style="color:var(--ac);font-size:8px">(활성 레이어)</span></div>
+    <div class="fr"><label>가로</label><div class="ig"><input type="number" id="imgW" value="745" min="1" max="8000"/><span class="iu">px</span><button class="lk on" id="lockBtn">🔒</button></div></div>
+    <div class="fr"><label>세로</label><div class="ig"><input type="number" id="imgH" value="320" min="1" max="8000"/><span class="iu">px</span></div></div>
+    <div class="br">
+      <button class="btn bs" style="flex:1;font-size:10px" id="fitBtn">캔버스 맞춤</button>
+      <button class="btn bs" style="flex:1;font-size:10px" id="origBtn">원본 크기</button>
+    </div>
+  </div>
+
+  <!-- IMAGE POSITION (active layer) -->
+  <div class="ps">
+    <div class="st">🖱 이미지 위치 <span style="color:var(--ac);font-size:8px">(활성 레이어)</span></div>
+    <div class="fr"><label>X</label><div class="ig"><input type="number" id="imgOffX" value="0"/><span class="iu">px</span></div></div>
+    <div class="fr"><label>Y</label><div class="ig"><input type="number" id="imgOffY" value="0"/><span class="iu">px</span></div></div>
+    <button class="btn bs bf" style="font-size:10px" id="centerBtn">↕ 캔버스 중앙 정렬</button>
+    <div class="dh">이동 모드에서 드래그로 이동 가능</div>
+  </div>
+
+  <!-- BACKGROUND -->
+  <div class="ps">
+    <div class="st">🎨 배경</div>
+    <div class="fr">
+      <label>배경색</label>
+      <div class="ig" style="gap:8px">
+        <input type="color" id="bgColor" value="#ffffff"/>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:10px;color:var(--tx2)"><input type="checkbox" id="bgTrans" style="width:12px;height:12px"/> 투명</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- MERGE -->
+  <div class="ps">
+    <div class="st">🔗 셀 병합</div>
+    <div class="mp">
+      <div class="mpi" id="selInfo">선택 모드에서 셀을 드래그하세요</div>
+      <div class="br">
+        <button class="btn bp" style="flex:1;font-size:10px" id="mergeBtn" disabled>⊞ 병합</button>
+        <button class="btn bs" style="flex:1;font-size:10px" id="unmergeBtn" disabled>⊟ 해제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="ps">
+    <div class="st">⚡ 작업</div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <button class="btn bp bf" id="generateBtn">✨ HTML 생성 &amp; 미리보기 갱신</button>
+      <button class="btn bg bf" id="downloadBtn">💾 셀 이미지 ZIP 저장</button>
+    </div>
+  </div>
+
+</aside>
+
+<!-- CANVAS -->
+<main class="ca" id="canvasArea">
+  <div class="ph" id="placeholder">
+    <div class="phi">🖼</div>
+    <span>이미지를 불러오거나 여기에 드래그하세요</span>
+  </div>
+  <div class="cw" id="canvasWrapper" style="display:none">
+    <canvas id="mainCanvas"></canvas>
+    <canvas id="overlayCanvas"></canvas>
+  </div>
+  <div class="ci" id="canvasInfo" style="display:none"></div>
+</main>
+
+<!-- HTML PANEL -->
+<div class="rp">
+  <div class="rph"><span class="rpt">🏗 생성된 HTML</span><span style="font-size:9px;color:var(--tx2)">자동 갱신</span></div>
+  <div class="how"><textarea id="htmlOutput" readonly placeholder="HTML 생성 버튼을 누르면 코드가 표시됩니다..."></textarea></div>
+  <div class="rpf">
+    <button class="btn bs bf" id="copyBtn">📋 HTML 복사</button>
+    <div class="ct h" id="copyToast">✅ 클립보드에 복사됐습니다!</div>
+  </div>
+</div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div class="ctx" id="ctxMenu">
+  <div class="ci2" id="ctx-ira">↑ 위에 행 삽입</div>
+  <div class="ci2" id="ctx-irb">↓ 아래에 행 삽입</div>
+  <div class="ci2" id="ctx-icl">← 왼쪽에 열 삽입</div>
+  <div class="ci2" id="ctx-icr">→ 오른쪽에 열 삽입</div>
+  <div class="csp"></div>
+  <div class="ci2 ng" id="ctx-dr">행 삭제</div>
+  <div class="ci2 ng" id="ctx-dc">열 삭제</div>
+  <div class="csp"></div>
+  <div class="ci2 ac" id="ctx-mg">⊞ 셀 병합</div>
+  <div class="ci2" id="ctx-um">⊟ 병합 해제</div>
+</div>
+
+<script>
+/* ── UTIL ── */
+const $=id=>document.getElementById(id);
+function hRgba(hex,a){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`}
+
+/* ── LAYERS ── */
+// layers[0]=bottommost, layers[N-1]=topmost→render 0..N-1
+let layers=[], alIdx=-1;
+function AL(){return alIdx>=0?layers[alIdx]:null}
+
+/* ── UNDO ── */
+let undoStack=[];
+const MAX_UNDO=40;
+function saveState(){
+  const snap={
+    layers:layers.map(l=>({...l})),
+    grid:G.map(row=>row.map(c=>({...c}))),
+    colWidths:[...gridColWidths],
+    rowHeights:[...gridRowHeights],
+    alIdx
+  };
+  if(undoStack.length>=MAX_UNDO)undoStack.shift();
+  undoStack.push(snap);
+}
+function undo(){
+  if(undoStack.length===0)return;
+  const snap=undoStack.pop();
+  layers=snap.layers.map(l=>({...l}));
+  G=snap.grid.map(row=>row.map(c=>({...c})));
+  gridColWidths=[...snap.colWidths];
+  gridRowHeights=[...snap.rowHeights];
+  alIdx=Math.min(snap.alIdx,layers.length-1);
+  $('delLayerBtn').disabled=layers.length===0;
+  $('statusPill').textContent=layers.length?`${layers.length}개 레이어`:'레이어 없음';
+  rebuildLayerPanel();syncALControls();syncGI();render();autoHTML();
+}
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo()}
+});
+
+function addLayer(img,name,file){
+  saveState();
+  const hasAlpha=file&&file.type==='image/png'?chkAlpha(img):false;
+  const w=img.naturalWidth,h=img.naturalHeight;
+  const l={id:Date.now(),name:name||`Layer ${layers.length+1}`,img,srcW:w,srcH:h,
+    w,h,ox:Math.round((pW()-w)/2),oy:Math.round((pH()-h)/2),
+    opacity:1,visible:true,hasAlpha,locked:true,ratio:w/h};
+  layers.push(l);alIdx=layers.length-1;
+  rebuildLayerPanel();syncALControls();render();autoHTML();
+  $('delLayerBtn').disabled=false;
+  $('statusPill').textContent=`${layers.length}개 레이어`;
+}
+
+function deleteLayer(idx){
+  saveState();
+  layers.splice(idx,1);
+  if(alIdx>=layers.length)alIdx=layers.length-1;
+  rebuildLayerPanel();syncALControls();render();autoHTML();
+  $('delLayerBtn').disabled=layers.length===0;
+  $('statusPill').textContent=layers.length?`${layers.length}개 레이어`:'레이어 없음';
+}
+
+function selectLayer(idx){alIdx=idx;rebuildLayerPanel();syncALControls()}
+
+function moveLayer(idx,up){
+  saveState();
+  const to=up?idx+1:idx-1;
+  if(to<0||to>=layers.length)return;
+  [layers[idx],layers[to]]=[layers[to],layers[idx]];
+  if(alIdx===idx)alIdx=to;else if(alIdx===to)alIdx=idx;
+  rebuildLayerPanel();syncALControls();render();
+}
+
+function drawThumb(layer,canvas){
+  const tw=canvas.width,th=canvas.height,ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,tw,th);
+  const sc=Math.min(tw/layer.srcW,th/layer.srcH);
+  const dw=layer.srcW*sc,dh=layer.srcH*sc;
+  ctx.drawImage(layer.img,(tw-dw)/2,(th-dh)/2,dw,dh);
+}
+
+function rebuildLayerPanel(){
+  const list=$('layerList');
+  if(layers.length===0){list.innerHTML='<div style="font-size:10px;color:var(--tx2);text-align:center;padding:8px">레이어 없음</div>';return}
+  // Display: topmost first (reverse of array)
+  list.innerHTML=layers.slice().reverse().map((l,di)=>{
+    const ai=layers.length-1-di; // array index
+    const act=ai===alIdx;
+    return`<div class="ly-item${act?' active':''}" data-ai="${ai}">
+      <button class="ly-eye" data-ai="${ai}">${l.visible?'👁':'🚫'}</button>
+      <canvas class="ly-thumb" width="40" height="30" data-ai="${ai}"></canvas>
+      <span class="ly-name" title="${l.name}">${l.name}</span>
+      <div class="ly-btns">
+        <button class="ly-btn ly-up" data-ai="${ai}" ${ai===layers.length-1?'disabled':''}>↑</button>
+        <button class="ly-btn ly-dn" data-ai="${ai}" ${ai===0?'disabled':''}>↓</button>
+      </div>
+    </div>`;
+  }).join('');
+  // Draw thumbs
+  list.querySelectorAll('.ly-thumb').forEach(c=>{
+    const ai=parseInt(c.dataset.ai);
+    if(layers[ai])drawThumb(layers[ai],c);
+  });
+}
+
+function syncALControls(){
+  const l=AL();
+  $('alc').style.display=l?'block':'none';
+  if(!l)return;
+  $('imgW').value=l.w;$('imgH').value=l.h;
+  $('imgOffX').value=l.ox;$('imgOffY').value=l.oy;
+  $('layerOp').value=Math.round(l.opacity*100);
+  $('lopVal').textContent=Math.round(l.opacity*100)+'%';
+}
+
+// Layer panel events (delegation)
+$('layerList').addEventListener('click',e=>{
+  const eye=e.target.closest('.ly-eye'),up=e.target.closest('.ly-up'),dn=e.target.closest('.ly-dn'),item=e.target.closest('[data-ai]');
+  if(!item)return;
+  const ai=parseInt(item.dataset.ai);
+  if(eye){layers[ai].visible=!layers[ai].visible;rebuildLayerPanel();render()}
+  else if(up)moveLayer(ai,true);
+  else if(dn)moveLayer(ai,false);
+  else{selectLayer(ai)}
+});
+
+$('delLayerBtn').addEventListener('click',()=>{if(alIdx>=0)deleteLayer(alIdx)});
+$('layerOp').addEventListener('input',()=>{const l=AL();if(!l)return;l.opacity=parseInt($('layerOp').value)/100;$('lopVal').textContent=$('layerOp').value+'%';render()});
+
+/* ── GRID ── */
+let G=[], gridColWidths=[], gridRowHeights=[];
+function gC(){return G.length>0?G[0].length:parseInt($('gridCols').value)||6}
+function gR(){return G.length}
+function gG(){return Math.max(0,parseInt($('gridGap').value)||0)}
+function pW(){return parseInt($('projW').value)||745}
+function pH(){return parseInt($('projH').value)||320}
+
+function initGrid(rows,cols){
+  G=[];for(let r=0;r<rows;r++){G[r]=[];for(let c=0;c<cols;c++)G[r][c]={colspan:1,rowspan:1,hidden:false}}
+  // Init widths/heights evenly
+  const gap=gG();
+  const w=pW(), h=pH();
+  const baseW=(w-gap*(cols-1))/cols, baseH=(h-gap*(rows-1))/rows;
+  gridColWidths=Array.from({length:cols},()=>baseW);
+  gridRowHeights=Array.from({length:rows},()=>baseH);
+  $('gridCols').value=cols;$('gridRows').value=rows;updHints();autoHTML();
+}
+function cellB(r,c){
+  const cell=G[r][c],gap=gG();
+  let x=0, y=0, w=0, h=0;
+  for(let i=0;i<c;i++)x+=gridColWidths[i]+gap;
+  for(let i=0;i<r;i++)y+=gridRowHeights[i]+gap;
+  for(let i=0;i<cell.colspan;i++)w+=gridColWidths[c+i];
+  w+=(cell.colspan-1)*gap;
+  for(let i=0;i<cell.rowspan;i++)h+=gridRowHeights[r+i];
+  h+=(cell.rowspan-1)*gap;
+  return{x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h)};
+}
+function baseCB(r,c){
+  const gap=gG();
+  let x=0, y=0;
+  for(let i=0;i<c;i++)x+=gridColWidths[i]+gap;
+  for(let i=0;i<r;i++)y+=gridRowHeights[i]+gap;
+  return{x:Math.round(x),y:Math.round(y),w:Math.round(gridColWidths[c]),h:Math.round(gridRowHeights[r])};
+}
+function pt2Cell(cx,cy){
+  const gap=gG(),cols=gC(),rows=gR();
+  let tx=0;
+  for(let c=0;c<cols;c++){
+    const x1=tx, x2=tx+gridColWidths[c];
+    if(cx>=x1&&cx<x2){
+      let ty=0;
+      for(let r=0;r<rows;r++){
+        const y1=ty, y2=ty+gridRowHeights[r];
+        if(cy>=y1&&cy<y2)return{r,c};
+        ty+=gridRowHeights[r]+gap;
+      }
+    }
+    tx+=gridColWidths[c]+gap;
+  }
+  return null;
+}
+function findOwner(r,c){
+  if(!G[r][c].hidden)return{r,c};
+  for(let pr=0;pr<=r;pr++)for(let pc=0;pc<=c;pc++){const cell=G[pr][pc];if(!cell.hidden&&pr+cell.rowspan-1>=r&&pc+cell.colspan-1>=c)return{r:pr,c:pc}}
+  return null;
+}
+function normSel(){const{r1,c1,r2,c2}=S.sel;return{r1:Math.min(r1,r2),c1:Math.min(c1,c2),r2:Math.max(r1,r2),c2:Math.max(c1,c2)}}
+function doUnmergeAt(r,c){
+  const cell=G[r][c],rs=cell.rowspan,cs=cell.colspan;cell.colspan=1;cell.rowspan=1;
+  for(let pr=r;pr<r+rs;pr++)for(let pc=c;pc<c+cs;pc++)if(pr!==r||pc!==c){G[pr][pc].hidden=false;G[pr][pc].colspan=1;G[pr][pc].rowspan=1}
+}
+function doMerge(){
+  if(!S.selActive)return;const{r1,c1,r2,c2}=normSel();if(r1===r2&&c1===c2)return;
+  saveState();
+  for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++){const o=findOwner(r,c);if(o)doUnmergeAt(o.r,o.c)}
+  G[r1][c1].colspan=c2-c1+1;G[r1][c1].rowspan=r2-r1+1;
+  for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++)if(r!==r1||c!==c1){G[r][c].hidden=true;G[r][c].colspan=1;G[r][c].rowspan=1}
+  render();autoHTML();updMergeUI();
+}
+function doUnmerge(){
+  if(!S.selActive)return;const{r1,c1,r2,c2}=normSel();
+  saveState();
+  for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++){const o=findOwner(r,c);if(o)doUnmergeAt(o.r,o.c)}
+  render();autoHTML();updMergeUI();
+}
+function unmergeRC(r,c,isRow){
+  if(isRow){for(let ci=0;ci<gC();ci++){const o=findOwner(r,ci);if(o)doUnmergeAt(o.r,o.c)}}
+  else{for(let ri=0;ri<gR();ri++){const o=findOwner(ri,c);if(o)doUnmergeAt(o.r,o.c)}}
+}
+function addRow(after){
+  saveState();const cols=gC();
+  const nr=Array.from({length:cols},()=>({colspan:1,rowspan:1,hidden:false}));
+  const baseH=gridRowHeights.length>0?gridRowHeights[0]:30;
+  if(after<0){G.unshift(nr);gridRowHeights.unshift(baseH)}
+  else{G.splice(after+1,0,nr);gridRowHeights.splice(after+1,0,baseH)}
+  syncGI();render();autoHTML();
+}
+function delRow(r){
+  if(gR()<=1)return;saveState();unmergeRC(r,0,true);
+  G.splice(r,1);gridRowHeights.splice(r,1);
+  S.selActive=false;syncGI();render();autoHTML();updMergeUI();
+}
+function addCol(after){
+  saveState();const rows=gR();
+  const baseW=gridColWidths.length>0?gridColWidths[0]:30;
+  for(let r=0;r<rows;r++){const nc={colspan:1,rowspan:1,hidden:false};if(after<0)G[r].unshift(nc);else G[r].splice(after+1,0,nc)}
+  if(after<0)gridColWidths.unshift(baseW);else gridColWidths.splice(after+1,0,baseW);
+  syncGI();render();autoHTML();
+}
+function delCol(c){
+  if(gC()<=1)return;saveState();unmergeRC(0,c,false);
+  for(let r=0;r<gR();r++)G[r].splice(c,1);gridColWidths.splice(c,1);
+  S.selActive=false;syncGI();render();autoHTML();updMergeUI();
+}
+function syncGI(){$('gridCols').value=gC();$('gridRows').value=gR();updHints()}
+
+/* ── STATE ── */
+const S={mode:'move',sel:{r1:0,c1:0,r2:0,c2:0},selActive:false,_sDrag:false,_sDragStart:{r:0,c:0},
+  _drag:false,_dx:0,_dy:0,_dox:0,_doy:0,_ctxCell:null,
+  _resize:false,_resizeCorner:null,_resizeAnchor:{x:0,y:0},_resizeLIdx:-1,
+  _gResize:false,_gResizeIdx:-1,_gResizeType:null, // type: 'col' or 'row'
+  zoom:1.0};
+
+function applyZoom(z){
+  S.zoom=Math.max(0.2,Math.min(3.0,z));$('zoomSlider').value=Math.round(S.zoom*100);$('zoomVal').textContent=Math.round(S.zoom*100)+'%';
+  const cw=$('canvasWrapper');cw.style.transform=`scale(${S.zoom})`;cw.style.transformOrigin='0 0';
+}
+$('zoomSlider').addEventListener('input',()=>applyZoom(parseInt($('zoomSlider').value)/100));
+
+/* ── RESIZE HANDLES ── */
+const HANDLE_R=6; // radius in canvas px
+function getHandles(l){return[['TL',l.ox,l.oy],['TR',l.ox+l.w,l.oy],['BL',l.ox,l.oy+l.h],['BR',l.ox+l.w,l.oy+l.h]]}
+function hitHandle(px,py,l){
+  const HIT=HANDLE_R+4;
+  for(const[n,hx,hy]of getHandles(l))if(Math.abs(px-hx)<=HIT&&Math.abs(py-hy)<=HIT)return n;
+  return null;
+}
+function cornerCursor(c){return(c==='TL'||c==='BR')?'nwse-resize':'nesw-resize'}
+
+function hitGridLine(cx,cy){
+  const gap=gG(),cols=gC(),rows=gR(),HIT=6;
+  // Check vertical lines (between columns)
+  let tx=0;
+  for(let c=0;c<cols-1;c++){
+    tx+=gridColWidths[c];
+    if(cx>=tx-HIT && cx<=tx+gap+HIT)return{type:'col',idx:c};
+    tx+=gap;
+  }
+  // Check horizontal lines (between rows)
+  let ty=0;
+  for(let r=0;r<rows-1;r++){
+    ty+=gridRowHeights[r];
+    if(cy>=ty-HIT && cy<=ty+gap+HIT)return{type:'row',idx:r};
+    ty+=gap;
+  }
+  return null;
+}
+
+/* ── RENDER ── */
+const mainCanvas=$('mainCanvas'),oc=$('overlayCanvas');
+let _rT=null;
+function throttleRender(){clearTimeout(_rT);_rT=setTimeout(render,55)}
+
+function render(){
+  const w=pW(),h=pH();
+  mainCanvas.width=w;mainCanvas.height=h;oc.width=w;oc.height=h;
+  const ctx=mainCanvas.getContext('2d');
+  if($('bgTrans').checked)ctx.clearRect(0,0,w,h);
+  else{ctx.fillStyle=$('bgColor').value;ctx.fillRect(0,0,w,h)}
+  // Render layers bottom to top
+  for(let i=0;i<layers.length;i++){
+    const l=layers[i];if(!l.visible)continue;
+    ctx.globalAlpha=l.opacity;ctx.drawImage(l.img,l.ox,l.oy,l.w,l.h);
+  }
+  ctx.globalAlpha=1;
+  drawOverlay();
+  $('placeholder').style.display='none';
+  $('canvasWrapper').style.display='inline-block';
+  $('canvasInfo').style.display='block';
+  const l=AL();$('canvasInfo').textContent=`캔버스: ${w}×${h}px | 격자: ${gC()}×${gR()}${l?` | 레이어: ${l.name} (${l.ox},${l.oy})`:''}`;
+}
+
+function drawOverlay(){
+  const ctx=oc.getContext('2d'),w=pW(),h=pH();ctx.clearRect(0,0,w,h);
+  if(gR()===0)return;
+  const op=parseInt($('gridOp').value)/100,col=$('gridColor').value;
+  const rows=gR(),cols=gC();
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const cell=G[r][c];if(cell.hidden)continue;
+    const{x,y,w:cw,h:ch}=cellB(r,c);const mg=cell.colspan>1||cell.rowspan>1;
+    ctx.fillStyle=hRgba(col,op*(mg?.12:.05));ctx.fillRect(x,y,cw,ch);
+    ctx.strokeStyle=hRgba(col,op);ctx.lineWidth=mg?2:1;ctx.strokeRect(x+.5,y+.5,cw-1,ch-1);
+    if(cw>32&&ch>14){ctx.fillStyle=hRgba(col,Math.min(1,op*1.4));ctx.font=`bold ${Math.min(11,Math.floor(Math.min(cw,ch)*.18))}px JetBrains Mono,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(mg?`R${r+1}C${c+1}[${cell.rowspan}×${cell.colspan}]`:`R${r+1}C${c+1}`,x+cw/2,y+ch/2)}
+  }
+  if(S.selActive&&S.mode==='select'){
+    const{r1,c1,r2,c2}=normSel();const a=baseCB(r1,c1),b=baseCB(r2,c2);
+    const sx=a.x,sy=a.y,sw=b.x+b.w-a.x,sh=b.y+b.h-a.y;
+    ctx.fillStyle='rgba(79,124,255,.18)';ctx.fillRect(sx,sy,sw,sh);
+    ctx.strokeStyle='rgba(79,124,255,.9)';ctx.lineWidth=2;ctx.strokeRect(sx+1,sy+1,sw-2,sh-2);
+    [[sx,sy],[sx+sw,sy],[sx,sy+sh],[sx+sw,sy+sh]].forEach(([px,py])=>{ctx.fillStyle='#4f7cff';ctx.beginPath();ctx.arc(px,py,4,0,Math.PI*2);ctx.fill()});
+  }
+  // Active layer resize handles (move mode)
+  if(S.mode==='move'){
+    const l=AL();if(l){
+      // Dashed bounding box
+      ctx.save();ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(79,124,255,0.55)';ctx.lineWidth=1;
+      ctx.strokeRect(l.ox+.5,l.oy+.5,l.w-1,l.h-1);ctx.restore();
+      // Corner handles
+      getHandles(l).forEach(([,hx,hy])=>{
+        ctx.beginPath();ctx.arc(hx,hy,HANDLE_R,0,Math.PI*2);
+        ctx.fillStyle='#fff';ctx.fill();
+        ctx.strokeStyle='#4f7cff';ctx.lineWidth=2;ctx.stroke();
+      });
+    }
+  }
+}
+
+/* ── HINTS ── */
+function updHints(){
+  $('dimHint').textContent=`${pW()} × ${pH()}`;
+  const c=gC(),r=gR();
+  $('cellHint').textContent=`${c}열×${r}행 (가변 크기)`;
+}
+
+/* ── HTML GEN ── */
+function genHTML(){
+  if(gR()===0)return'';
+  const cols=gC(),rows=gR(),gap=gG();
+  const L=[];L.push('<table cellpadding="0" cellspacing="0" class="NHN_Layout_Main">');
+  for(let r=0;r<rows;r++){
+    const trContent=[];
+    let first=true;
+    for(let c=0;c<cols;c++){
+      const cell=G[r][c];if(cell.hidden)continue;
+      const{w:cw,h:ch}=cellB(r,c);
+      const ca=cell.colspan>1?` colspan="${cell.colspan}"`:'';
+      const ra=cell.rowspan>1?` rowspan="${cell.rowspan}"`:'';
+      
+      let tdHtml='';
+      if(!first&&gap>0)tdHtml+=`<td width="${gap}"></td>\n`;
+      first=false;
+      
+      tdHtml+=`<td class="NHN_Layout_Preset" valign="top"${ca}${ra}>\n`;
+      tdHtml+=`  <table width="${cw}" height="${ch}" cellpadding="0" cellspacing="0" class="Basicborder NHN_Layout">\n`;
+      tdHtml+=`    <tr><td class="m-tcol-c"></td></tr>\n`;
+      tdHtml+=`  </table>\n`;
+      tdHtml+=`</td>`;
+      trContent.push(tdHtml);
+    }
+    if(trContent.length>0){
+      L.push('<tr>\n' + trContent.join('\n') + '\n</tr>');
+      if(r<rows-1&&gap>0)L.push(`<tr><td colspan="${cols*2-1}" height="${gap}"></td></tr>`);
+    }
+  }
+  L.push('</table>');return L.join('\n');
+}
+let _hT=null;
+function autoHTML(){clearTimeout(_hT);_hT=setTimeout(()=>{$('htmlOutput').value=genHTML()},80)}
+
+/* ── FILE LOAD ── */
+function chkAlpha(img){
+  const c=document.createElement('canvas');const sw=Math.min(img.naturalWidth,200),sh=Math.min(img.naturalHeight,200);
+  c.width=sw;c.height=sh;const ctx=c.getContext('2d');ctx.drawImage(img,0,0,sw,sh);
+  const d=ctx.getImageData(0,0,sw,sh).data;for(let i=3;i<d.length;i+=4)if(d[i]<255)return true;return false;
+}
+function loadFile(file){
+  if(!file||!file.type.startsWith('image/'))return;
+  const url=URL.createObjectURL(file);const img=new Image();
+  img.onload=()=>{addLayer(img,file.name.replace(/\.[^.]+$/,''),file);URL.revokeObjectURL(url)};
+  img.onerror=()=>{alert('이미지를 불러올 수 없습니다');URL.revokeObjectURL(url)};
+  img.src=url;
+}
+// Sidebar drop zone
+$('dropZone').addEventListener('click',()=>$('fileInput').click());
+$('fileInput').addEventListener('change',e=>{loadFile(e.target.files[0]);$('fileInput').value=''});
+$('dropZone').addEventListener('dragover',e=>{e.preventDefault();e.stopPropagation();$('dropZone').classList.add('ov')});
+$('dropZone').addEventListener('dragleave',()=>$('dropZone').classList.remove('ov'));
+$('dropZone').addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();$('dropZone').classList.remove('ov');const f=e.dataTransfer.files[0];if(f)loadFile(f)});
+// Canvas area drop
+const CA=$('canvasArea');
+CA.addEventListener('dragover',e=>{e.preventDefault();CA.classList.add('dv')});
+CA.addEventListener('dragleave',e=>{if(!CA.contains(e.relatedTarget))CA.classList.remove('dv')});
+CA.addEventListener('drop',e=>{
+  e.preventDefault();CA.classList.remove('dv');
+  const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))loadFile(f);
+});
+
+/* ── ASPECT LOCK ── */
+$('lockBtn').addEventListener('click',()=>{
+  const l=AL();if(!l)return;l.locked=!l.locked;
+  $('lockBtn').textContent=l.locked?'🔒':'🔓';$('lockBtn').classList.toggle('on',l.locked);
+  if(l.locked)l.ratio=l.w/l.h;
+});
+$('imgW').addEventListener('input',()=>{const l=AL();if(!l)return;l.w=parseInt($('imgW').value)||1;if(l.locked){l.h=Math.round(l.w/l.ratio)||1;$('imgH').value=l.h}throttleRender()});
+$('imgH').addEventListener('input',()=>{const l=AL();if(!l)return;l.h=parseInt($('imgH').value)||1;if(l.locked){l.w=Math.round(l.h*l.ratio)||1;$('imgW').value=l.w}throttleRender()});
+$('fitBtn').addEventListener('click',()=>{const l=AL();if(!l)return;l.w=pW();l.h=pH();if(l.locked)l.ratio=pW()/pH();syncALControls();render()});
+$('origBtn').addEventListener('click',()=>{const l=AL();if(!l)return;l.w=l.srcW;l.h=l.srcH;if(l.locked)l.ratio=l.srcW/l.srcH;syncALControls();render()});
+
+/* ── OFFSET ── */
+$('imgOffX').addEventListener('input',()=>{const l=AL();if(!l)return;l.ox=parseInt($('imgOffX').value)||0;throttleRender()});
+$('imgOffY').addEventListener('input',()=>{const l=AL();if(!l)return;l.oy=parseInt($('imgOffY').value)||0;throttleRender()});
+$('centerBtn').addEventListener('click',()=>{const l=AL();if(!l)return;l.ox=Math.round((pW()-l.w)/2);l.oy=Math.round((pH()-l.h)/2);syncALControls();render()});
+
+/* ── PROJ/GRID INPUTS ── */
+[$('projW'),$('projH')].forEach(el=>el.addEventListener('input',()=>{updHints();throttleRender()}));
+[$('gridCols'),$('gridRows')].forEach(el=>el.addEventListener('change',()=>{initGrid(parseInt($('gridRows').value)||1,parseInt($('gridCols').value)||6)}));
+$('gridGap').addEventListener('input',()=>{updHints();if(gR()>0){render();autoHTML()}});
+$('gridOp').addEventListener('input',()=>{$('gopVal').textContent=$('gridOp').value+'%';if(gR()>0)drawOverlay()});
+$('gridColor').addEventListener('input',()=>{if(gR()>0)drawOverlay()});
+[$('bgColor'),$('bgTrans')].forEach(el=>el.addEventListener('change',()=>render()));
+
+/* ── ROW/COL BUTTONS ── */
+$('addRowBtn').addEventListener('click',()=>addRow(gR()-1));
+$('delRowBtn').addEventListener('click',()=>{if(gR()>0)delRow(gR()-1)});
+$('addColBtn').addEventListener('click',()=>addCol(gC()-1));
+$('delColBtn').addEventListener('click',()=>{if(gC()>0)delCol(gC()-1)});
+
+/* ── MODE ── */
+$('btnMove').addEventListener('click',()=>setMode('move'));
+$('btnSelect').addEventListener('click',()=>setMode('select'));
+function setMode(m){S.mode=m;S.selActive=false;$('btnMove').classList.toggle('on',m==='move');$('btnSelect').classList.toggle('on',m==='select');oc.classList.toggle('mv',m==='move');if(gR()>0)drawOverlay();updMergeUI()}
+
+/* ── MERGE UI ── */
+function updMergeUI(){
+  if(!S.selActive||gR()===0){$('mergeBtn').disabled=true;$('unmergeBtn').disabled=true;$('selInfo').textContent=S.mode==='select'?'셀을 드래그해서 선택하세요':'선택 모드로 전환하세요';return}
+  const{r1,c1,r2,c2}=normSel();const multi=r1!==r2||c1!==c2;
+  $('selInfo').textContent=`선택: R${r1+1}C${c1+1} ~ R${r2+1}C${c2+1}`;$('mergeBtn').disabled=!multi;
+  let hm=false;for(let r=r1;r<=r2&&!hm;r++)for(let c=c1;c<=c2&&!hm;c++){const o=findOwner(r,c);if(o){const cell=G[o.r][o.c];if(cell.colspan>1||cell.rowspan>1)hm=true}}
+  $('unmergeBtn').disabled=!hm;
+}
+$('mergeBtn').addEventListener('click',doMerge);$('unmergeBtn').addEventListener('click',doUnmerge);
+
+/* ── CANVAS EVENTS ── */
+function canvasPos(e){
+  const rect=oc.getBoundingClientRect();
+  const cx=e.touches?e.touches[0].clientX:e.clientX,cy=e.touches?e.touches[0].clientY:e.clientY;
+  return{x:(cx-rect.left)*(oc.width/rect.width),y:(cy-rect.top)*(oc.height/rect.height)};
+}
+oc.addEventListener('mousedown',e=>{
+  if(e.button===2)return;
+  if(S.mode==='move'){
+    const l=AL();if(!l)return;e.preventDefault();
+    const p=canvasPos(e);
+    const corner=hitHandle(p.x,p.y,l);
+    if(corner){
+      saveState();
+      // Start resize
+      S._resize=true;S._resizeCorner=corner;S._resizeLIdx=alIdx;
+      // Anchor = opposite corner
+      if(corner==='TL')S._resizeAnchor={x:l.ox+l.w,y:l.oy+l.h};
+      else if(corner==='TR')S._resizeAnchor={x:l.ox,y:l.oy+l.h};
+      else if(corner==='BL')S._resizeAnchor={x:l.ox+l.w,y:l.oy};
+      else S._resizeAnchor={x:l.ox,y:l.oy};
+      oc.style.cursor=cornerCursor(corner);
+    } else {
+      saveState();
+      S._drag=true;S._dx=p.x;S._dy=p.y;S._dox=l.ox;S._doy=l.oy;oc.classList.add('dr');
+    }
+  } else {
+    if(gR()===0)return;e.preventDefault();
+    const p=canvasPos(e);
+    // Check for grid line resize
+    const hit=hitGridLine(p.x,p.y);
+    if(hit){
+      saveState();
+      S._gResize=true;S._gResizeIdx=hit.idx;S._gResizeType=hit.type;
+      S._dx=p.x;S._dy=p.y;
+    } else {
+      const cell=pt2Cell(p.x,p.y);if(!cell)return;
+      S._sDrag=true;S._sDragStart={r:cell.r,c:cell.c};S.sel={r1:cell.r,c1:cell.c,r2:cell.r,c2:cell.c};S.selActive=true;drawOverlay();updMergeUI();
+    }
+  }
+});
+window.addEventListener('mousemove',e=>{
+  if(S._resize){
+    const l=layers[S._resizeLIdx];if(!l)return;
+    const p=canvasPos(e);const{x:ax,y:ay}=S._resizeAnchor;
+    let rawW=Math.abs(p.x-ax),rawH=Math.abs(p.y-ay);
+    // Aspect ratio lock
+    const ratio=l.ratio;
+    if(rawW/ratio>rawH)rawH=rawW/ratio;else rawW=rawH*ratio;
+    rawW=Math.max(20,rawW);rawH=Math.max(20,rawH);
+    l.w=Math.round(rawW);l.h=Math.round(rawH);
+    const c=S._resizeCorner;
+    if(c==='TL'){l.ox=Math.round(ax-rawW);l.oy=Math.round(ay-rawH)}
+    else if(c==='TR'){l.ox=ax;l.oy=Math.round(ay-rawH)}
+    else if(c==='BL'){l.ox=Math.round(ax-rawW);l.oy=ay}
+    else{l.ox=ax;l.oy=ay}
+    $('imgW').value=l.w;$('imgH').value=l.h;$('imgOffX').value=l.ox;$('imgOffY').value=l.oy;
+    throttleRender();
+  } else if(S._gResize){
+    const p=canvasPos(e);
+    if(S._gResizeType==='col'){
+      const idx=S._gResizeIdx;
+      const diff=p.x-S._dx;
+      const min=20;
+      if(gridColWidths[idx]+diff>min && gridColWidths[idx+1]-diff>min){
+        gridColWidths[idx]+=diff;
+        gridColWidths[idx+1]-=diff;
+        S._dx=p.x;
+        throttleRender();autoHTML();
+      }
+    } else {
+      const idx=S._gResizeIdx;
+      const diff=p.y-S._dy;
+      const min=20;
+      if(gridRowHeights[idx]+diff>min && gridRowHeights[idx+1]-diff>min){
+        gridRowHeights[idx]+=diff;
+        gridRowHeights[idx+1]-=diff;
+        S._dy=p.y;
+        throttleRender();autoHTML();
+      }
+    }
+  } else if(S.mode==='move'&&S._drag){
+    const l=AL();if(!l)return;const p=canvasPos(e);l.ox=Math.round(S._dox+(p.x-S._dx));l.oy=Math.round(S._doy+(p.y-S._dy));$('imgOffX').value=l.ox;$('imgOffY').value=l.oy;throttleRender()
+  } else if(S.mode==='select'&&S._sDrag){
+    const p=canvasPos(e);const cell=pt2Cell(p.x,p.y);if(cell){S.sel.r2=cell.r;S.sel.c2=cell.c;drawOverlay();updMergeUI()}
+  } else if(S.mode==='move'){
+    // Cursor update on hover
+    const l=AL();if(!l){oc.style.cursor='';return}
+    const p=canvasPos(e);const c=hitHandle(p.x,p.y,l);
+    oc.style.cursor=c?cornerCursor(c):'grab';
+  } else if(S.mode==='select'){
+    const p=canvasPos(e);
+    const hit=hitGridLine(p.x,p.y);
+    oc.style.cursor=hit?(hit.type==='col'?'col-resize':'row-resize'):'crosshair';
+  }
+});
+window.addEventListener('mouseup',()=>{
+  if(S._resize){S._resize=false;S._resizeCorner=null;oc.style.cursor='grab';rebuildLayerPanel()}
+  if(S._gResize){S._gResize=false;S._gResizeIdx=-1;S._gResizeType=null}
+  S._drag=false;S._sDrag=false;oc.classList.remove('dr');
+});
+
+// Wheel zoom
+oc.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const delta=e.deltaY>0?-0.1:0.1;
+  applyZoom(S.zoom+delta);
+}, {passive:false});
+
+// Right-click context menu
+oc.addEventListener('contextmenu',e=>{
+  e.preventDefault();if(gR()===0)return;
+  const p=canvasPos(e);S._ctxCell=pt2Cell(p.x,p.y);
+  const{r1,c1,r2,c2}=normSel();const multi=S.selActive&&(r1!==r2||c1!==c2);
+  let hm=false;if(S.selActive)for(let r=r1;r<=r2&&!hm;r++)for(let c=c1;c<=c2&&!hm;c++){const o=findOwner(r,c);if(o){const cell=G[o.r][o.c];if(cell.colspan>1||cell.rowspan>1)hm=true}}
+  $('ctx-mg').style.display=multi?'block':'none';$('ctx-um').style.display=hm?'block':'none';
+  const cm=$('ctxMenu');cm.style.left=e.clientX+'px';cm.style.top=e.clientY+'px';cm.classList.add('show');
+});
+document.addEventListener('click',()=>$('ctxMenu').classList.remove('show'));
+$('ctxMenu').addEventListener('click',e=>e.stopPropagation());
+$('ctx-ira').addEventListener('click',()=>{const r=S._ctxCell?S._ctxCell.r:0;addRow(r-1);$('ctxMenu').classList.remove('show')});
+$('ctx-irb').addEventListener('click',()=>{const r=S._ctxCell?S._ctxCell.r:gR()-1;addRow(r);$('ctxMenu').classList.remove('show')});
+$('ctx-icl').addEventListener('click',()=>{const c=S._ctxCell?S._ctxCell.c:0;addCol(c-1);$('ctxMenu').classList.remove('show')});
+$('ctx-icr').addEventListener('click',()=>{const c=S._ctxCell?S._ctxCell.c:gC()-1;addCol(c);$('ctxMenu').classList.remove('show')});
+$('ctx-dr').addEventListener('click',()=>{if(S._ctxCell)delRow(S._ctxCell.r);$('ctxMenu').classList.remove('show')});
+$('ctx-dc').addEventListener('click',()=>{if(S._ctxCell)delCol(S._ctxCell.c);$('ctxMenu').classList.remove('show')});
+$('ctx-mg').addEventListener('click',()=>{doMerge();$('ctxMenu').classList.remove('show')});
+$('ctx-um').addEventListener('click',()=>{doUnmerge();$('ctxMenu').classList.remove('show')});
+
+/* ── GENERATE / COPY ── */
+$('generateBtn').addEventListener('click',()=>{if(layers.length>0||gR()>0)render();autoHTML()});
+$('copyBtn').addEventListener('click',()=>{if(!$('htmlOutput').value)return;navigator.clipboard.writeText($('htmlOutput').value).then(showToast).catch(()=>{$('htmlOutput').select();document.execCommand('copy');showToast()})});
+function showToast(){$('copyToast').classList.remove('h');setTimeout(()=>$('copyToast').classList.add('h'),2300)}
+
+/* ── ZIP DOWNLOAD ── */
+$('downloadBtn').addEventListener('click',async()=>{
+  if(gR()===0)return;
+  const w=pW(),h=pH(),transp=$('bgTrans').checked||layers.some(l=>l.hasAlpha);
+  const off=document.createElement('canvas');off.width=w;off.height=h;
+  const octx=off.getContext('2d');octx.clearRect(0,0,w,h);
+  if(!transp){octx.fillStyle=$('bgColor').value;octx.fillRect(0,0,w,h)}
+  for(let i=0;i<layers.length;i++){const l=layers[i];if(!l.visible)continue;octx.globalAlpha=l.opacity;octx.drawImage(l.img,l.ox,l.oy,l.w,l.h)}
+  octx.globalAlpha=1;
+  const zip=new JSZip(),cc=document.createElement('canvas'),cctx=cc.getContext('2d');let cnt=0;
+  for(let r=0;r<gR();r++)for(let c=0;c<gC();c++){
+    const cell=G[r][c];if(cell.hidden)continue;
+    const{x,y,w:cw,h:ch}=cellB(r,c);cc.width=cw;cc.height=ch;cctx.clearRect(0,0,cw,ch);
+    if(!transp){cctx.fillStyle=$('bgColor').value;cctx.fillRect(0,0,cw,ch)}
+    cctx.drawImage(off,x,y,cw,ch,0,0,cw,ch);
+    const blob=await new Promise(res=>cc.toBlob(res,'image/png'));zip.file(`cell_r${r+1}_c${c+1}.png`,blob);cnt++;
+  }
+  const zb=await zip.generateAsync({type:'blob'});const a=document.createElement('a');a.href=URL.createObjectURL(zb);a.download='naver_cafe_cells.zip';a.click();URL.revokeObjectURL(a.href);
+  $('statusPill').textContent=`✅ ${cnt}셀 저장됨`;setTimeout(()=>$('statusPill').textContent=`${layers.length}개 레이어`,2800);
+});
+
+/* ── INIT ── */
+updHints();$('gopVal').textContent=$('gridOp').value+'%';
+initGrid(parseInt($('gridRows').value)||1,parseInt($('gridCols').value)||6);
+[$('gridCols'),$('gridRows')].forEach(el=>{
+  el.addEventListener('keydown', e=>{if(e.key==='Enter')initGrid(parseInt($('gridRows').value),parseInt($('gridCols').value))});
+  el.addEventListener('blur', ()=>initGrid(parseInt($('gridRows').value),parseInt($('gridCols').value)));
+});
+rebuildLayerPanel();
+// Show canvas placeholder even without image (grid can be shown)
+render();
+</script>
+</body>
+</html>
