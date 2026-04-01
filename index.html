@@ -74,10 +74,10 @@ input[type=color]{width:24px;height:24px;border:1px solid var(--bd);border-radiu
 .ca.dv{border:2px dashed var(--ac);background:rgba(79,124,255,.04)}
 .ph{display:flex;flex-direction:column;align-items:center;gap:9px;color:var(--tx2);font-size:13px;opacity:.4}
 .phi{font-size:40px}
-.cw{position:relative;display:inline-block;box-shadow:0 8px 36px rgba(0,0,0,.6);border-radius:3px;overflow:hidden}
+.cw{position:relative;display:inline-block;box-shadow:0 8px 36px rgba(0,0,0,.6);border-radius:3px;overflow:visible}
 .cw::before{content:'';position:absolute;inset:0;background-image:linear-gradient(45deg,#2a2a2a 25%,transparent 25%),linear-gradient(-45deg,#2a2a2a 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#2a2a2a 75%),linear-gradient(-45deg,transparent 75%,#2a2a2a 75%);background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0;z-index:0}
 #mainCanvas{position:relative;z-index:1;display:block}
-#overlayCanvas{position:absolute;inset:0;z-index:2;pointer-events:auto;cursor:crosshair}
+#overlayCanvas{position:absolute;z-index:2;pointer-events:auto;cursor:crosshair}
 #overlayCanvas.mv{cursor:grab}#overlayCanvas.mv.dr{cursor:grabbing}
 .ci{font-size:10px;color:var(--tx2);font-family:'JetBrains Mono',monospace}
 /* right panel */
@@ -516,7 +516,7 @@ const S={mode:'move',sel:{r1:0,c1:0,r2:0,c2:0},selActive:false,_sDrag:false,_sDr
   _drag:false,_dx:0,_dy:0,_dox:0,_doy:0,_ctxCell:null,
   _resize:false,_resizeCorner:null,_resizeAnchor:{x:0,y:0},_resizeLIdx:-1,
   _gResize:false,_gResizeIdx:-1,_gResizeType:null, // type: 'col' or 'row'
-  zoom:1.0};
+  zoom:1.0, OFS:60};
 
 function applyZoom(z){
   S.zoom=Math.max(0.2,Math.min(3.0,z));$('zoomSlider').value=Math.round(S.zoom*100);$('zoomVal').textContent=Math.round(S.zoom*100)+'%';
@@ -560,7 +560,9 @@ function throttleRender(){clearTimeout(_rT);_rT=setTimeout(render,55)}
 
 function render(){
   const w=pW(),h=pH();
-  mainCanvas.width=w;mainCanvas.height=h;oc.width=w;oc.height=h;
+  mainCanvas.width=w;mainCanvas.height=h;
+  oc.width=w+S.OFS*2;oc.height=h+S.OFS*2;
+  oc.style.left=`-${S.OFS}px`;oc.style.top=`-${S.OFS}px`;
   const ctx=mainCanvas.getContext('2d');
   if($('bgTrans').checked)ctx.clearRect(0,0,w,h);
   else{ctx.fillStyle=$('bgColor').value;ctx.fillRect(0,0,w,h)}
@@ -578,8 +580,10 @@ function render(){
 }
 
 function drawOverlay(){
-  const ctx=oc.getContext('2d'),w=pW(),h=pH();ctx.clearRect(0,0,w,h);
-  if(gR()===0)return;
+  const ctx=oc.getContext('2d'),w=pW(),h=pH();
+  ctx.clearRect(0,0,oc.width,oc.height);
+  ctx.save();ctx.translate(S.OFS,S.OFS);
+  if(gR()===0){ctx.restore();return;}
   const op=parseInt($('gridOp').value)/100,col=$('gridColor').value;
   const rows=gR(),cols=gC();
   for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
@@ -610,6 +614,7 @@ function drawOverlay(){
       });
     }
   }
+  ctx.restore();
 }
 
 /* ── HINTS ── */
@@ -777,7 +782,8 @@ $('mergeBtn').addEventListener('click',doMerge);$('unmergeBtn').addEventListener
 function canvasPos(e){
   const rect=oc.getBoundingClientRect();
   const cx=e.touches?e.touches[0].clientX:e.clientX,cy=e.touches?e.touches[0].clientY:e.clientY;
-  return{x:(cx-rect.left)*(oc.width/rect.width),y:(cy-rect.top)*(oc.height/rect.height)};
+  const rawX=(cx-rect.left)*(oc.width/rect.width),rawY=(cy-rect.top)*(oc.height/rect.height);
+  return{x:rawX-S.OFS,y:rawY-S.OFS};
 }
 oc.addEventListener('mousedown',e=>{
   if(e.button===2)return;
