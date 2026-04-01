@@ -427,7 +427,8 @@ function initGrid(rows,cols){
   const baseW=(w-gap*(cols-1))/cols, baseH=(h-gap*(rows-1))/rows;
   gridColWidths=Array.from({length:cols},()=>baseW);
   gridRowHeights=Array.from({length:rows},()=>baseH);
-  $('gridCols').value=cols;$('gridRows').value=rows;updHints();autoHTML();render();
+  $('gridCols').value=cols;$('gridRows').value=rows;
+  normalizeGrid(); updHints(); autoHTML(); render();
 }
 function cellB(r,c){
   const cell=G[r][c],gap=gG();
